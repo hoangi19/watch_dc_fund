@@ -1,0 +1,227 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: My API Gateway and Lambda function
+
+Parameters:
+  apiGatewayName:
+    Type: String
+    Default: dcFund
+  apiGatewayStageName:
+    Type: String
+    Default: dev
+  apiGatewayPriceName:
+    Type: String
+    AllowedPattern: '[a-z0-9]+'
+    Default: price
+  apiGatewayStockName:
+    Type: String
+    AllowedPattern: '[a-z0-9]+'
+    Default: stock
+  apiGatewayValueName:
+    Type: String
+    AllowedPattern: '[a-z0-9]+'
+    Default: value
+  lambdaFunctionPriceName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9]+[a-zA-Z0-9-]+[a-zA-Z0-9]+'
+    Default: dcFundPrice
+  lambdaFunctionStockName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9]+[a-zA-Z0-9-]+[a-zA-Z0-9]+'
+    Default: dcFundStock
+  lambdaFunctionValueName:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9]+[a-zA-Z0-9-]+[a-zA-Z0-9]+'
+    Default: dcFundValue
+
+Resources:
+  dcFundApiGateWay:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Ref apiGatewayName
+  apiPrice:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref dcFundApiGateWay
+      ParentId: !GetAtt dcFundApiGateWay.RootResourceId
+      PathPart: !Ref apiGatewayPriceName
+  apiStock:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref dcFundApiGateWay
+      ParentId: !GetAtt dcFundApiGateWay.RootResourceId
+      PathPart: !Ref apiGatewayStockName
+  apiValue:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref dcFundApiGateWay
+      ParentId: !GetAtt dcFundApiGateWay.RootResourceId
+      PathPart: !Ref apiGatewayValueName
+    
+  apiPriceGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref dcFundApiGateWay
+      ResourceId: !Ref apiPrice
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaFunctionPrice.Arn}/invocations"
+  apiStockGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref dcFundApiGateWay
+      ResourceId: !Ref apiStock
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaFunctionStock.Arn}/invocations"
+  apiValueGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref dcFundApiGateWay
+      ResourceId: !Ref apiValue
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaFunctionValue.Arn}/invocations"
+  apiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - apiPriceGetMethod
+      - apiStockGetMethod
+      - apiValueGetMethod
+    Properties:
+      RestApiId: !Ref dcFundApiGateWay
+      StageName: !Ref apiGatewayStageName
+
+  lambdaFunctionPrice:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          def handler(event,context):
+            return {
+              'body': 'Hello there {0}'.format(event['requestContext']['identity']['sourceIp']),
+              'headers': {
+                'Content-Type': 'text/plain'
+              },
+              'statusCode': 200
+            }
+      Description: Lambda function Price
+      FunctionName: !Ref lambdaFunctionPriceName
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt lambdaIAMRole.Arn
+      Runtime: python3.8
+  lambdaFunctionStock:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          def handler(event,context):
+            return {
+              'body': 'Hello there {0}'.format(event['requestContext']['identity']['sourceIp']),
+              'headers': {
+                'Content-Type': 'text/plain'
+              },
+              'statusCode': 200
+            }
+      Description: Lambda function Stock
+      FunctionName: !Ref lambdaFunctionStockName
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt lambdaIAMRole.Arn
+      Runtime: python3.8
+  lambdaFunctionValue:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          def handler(event,context):
+            return {
+              'body': 'Hello there {0}'.format(event['requestContext']['identity']['sourceIp']),
+              'headers': {
+                'Content-Type': 'text/plain'
+              },
+              'statusCode': 200
+            }
+      Description: Lambda function Value
+      FunctionName: !Ref lambdaFunctionValueName
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt lambdaIAMRole.Arn
+      Runtime: python3.8
+
+  lambdaIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      Policies:
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:GetRecords
+                Effect: Allow
+                Resource:
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*:*
+                  - !Sub arn:aws:dynamodb:*:${AWS::AccountId}:table/dc_fund
+          PolicyName: lambdaAccessDynamoDB
+
+  lambdaApiGatewayInvokePriceFunc:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - lambdaFunctionPrice
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref lambdaFunctionPriceName
+      Principal: apigateway.amazonaws.com
+      # note: if route *not* at API Gateway root, `SourceArn` would take the form of:
+      #               arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/${apiGatewayStageName}/${apiGatewayHTTPMethod}/PATH_PART
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${dcFundApiGateWay}/*
+  lambdaApiGatewayInvokeStockFunc:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - lambdaFunctionStock
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref lambdaFunctionStockName
+      Principal: apigateway.amazonaws.com
+      # note: if route *not* at API Gateway root, `SourceArn` would take the form of:
+      #               arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/${apiGatewayStageName}/${apiGatewayHTTPMethod}/PATH_PART
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${dcFundApiGateWay}/*
+  lambdaApiGatewayInvokeValueFunc:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - lambdaFunctionValue
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref lambdaFunctionValueName
+      Principal: apigateway.amazonaws.com
+      # note: if route *not* at API Gateway root, `SourceArn` would take the form of:
+      #               arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/${apiGatewayStageName}/${apiGatewayHTTPMethod}/PATH_PART
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${dcFundApiGateWay}/*
+
+Outputs:
+  apiGatewayInvokeURL:
+    Value: !Sub https://${dcFundApiGateWay}.execute-api.${AWS::Region}.amazonaws.com
